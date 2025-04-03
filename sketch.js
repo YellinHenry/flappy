@@ -287,7 +287,7 @@ function draw() {
             const secondsLeft = Math.ceil(restartTimer);
             ctx.fillText(`Play again in: ${secondsLeft}s`, gameAreaWidth / 2, canvas.height / 2 + 50);
         } else {
-            ctx.fillText("Press SPACE to play again", gameAreaWidth / 2, canvas.height / 2 + 50);
+            ctx.fillText("play again", gameAreaWidth / 2, canvas.height / 2 + 50);
         }
         
         ctx.textAlign = "left"; // Reset text alignment
