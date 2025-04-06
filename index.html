@@ -11,5 +11,53 @@
     <main>
     </main>
     <script src="sketch.js"></script>
+    <button onclick="connectToESP()">Connect to ESP</button>
+<script>
+let port;
+let reader;
+let inputDone;
+let outputDone;
+let inputStream;
+let outputStream;
+
+async function connectToESP() {
+  try {
+    // Prompt user to select serial port
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 9600 });
+
+    // Set up reader
+    const textDecoder = new TextDecoderStream();
+    inputDone = port.readable.pipeTo(textDecoder.writable);
+    inputStream = textDecoder.readable;
+
+    reader = inputStream.getReader();
+
+    readLoop();
+
+    // Set up writer
+    const textEncoder = new TextEncoderStream();
+    outputDone = textEncoder.readable.pipeTo(port.writable);
+    outputStream = textEncoder.writable;
+    writer = outputStream.getWriter();
+
+    // Send message
+    await writer.write("Hello ESP!\n");
+    await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n"); await writer.write("Hello ESP!\n");
+
+  } catch (err) {
+    console.error("Connection failed:", err);
+  }
+}
+
+async function readLoop() {
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    console.log("[ESP] " + value);
+  }
+}
+</script>
+
   </body>
 </html>

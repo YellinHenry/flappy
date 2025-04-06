@@ -1,4 +1,4 @@
-//# 1. Make sure you're in your project directory
+
 //git add .
 //git commit -m "Changes"
 //git push origin main  
@@ -18,8 +18,8 @@ let restartCountdown = 10;      // seconds till restart
 let isFirstPipe = true;         // first pipe flag
 
 // ----- TIMER STUFF -----
-let gameTimer = 180;            // 3 min game time (seconds)
-let pauseTimer = 0;             // pause duration (seconds)
+let gameTimer = 180;            // 3 min game time in sec
+let pauseTimer = 0;             // pause duration in sec
 let isPaused = false;           // is game paused?
 
 // ----- FLAPPY BIRD SETTINGS -----
@@ -53,7 +53,7 @@ let chartWidth = 200;           // width of chart area
 let gameAreaX = 0;              // game area x position
 let gameAreaWidth = 1000;       // game area width
 
-// ----- BIRD PROPERTIES -----
+// ----- BIRD SHIT -----
 let bird = {
     x: 50,                      // bird x position
     y: 200,                     // bird y position
@@ -71,7 +71,7 @@ let pipeWidth = 50;             // width of pipes
 // ----- INPUT TRACKING -----
 let keysPressed = {};           // which keys are pressed
 
-// ----- GET CURRENT DATE FOR CHART -----
+// ---- CURRENT DATE In MY   CHART -----
 function getCurrentDate() {
     const now = new Date();
     const day = String(now.getDate()).padStart(2, '0');
@@ -150,7 +150,7 @@ document.addEventListener("keydown", function(event) {
         }
     }
     
-    // ----- CHART INPUT HANDLING -----
+    // ----- CHART INPUT STUFF -----
     if (isInputActive) {
         if (event.key === "Enter") {
             // save input and add new row
@@ -165,17 +165,17 @@ document.addEventListener("keydown", function(event) {
         else if (/^\d$/.test(event.key)) {  // only allow numbers
             currentInputValue += event.key;
         }
-        event.preventDefault();  // prevent default keyboard actions
+        event.preventDefault();  // prevent keyboard actions
     }
     
-    // toggle chart input with Tab
+    // move chart input with Tab. prob needa delete TS.PMO
     if (event.key === "Tab") {
         isInputActive = !isInputActive;
         event.preventDefault();
     }
 });
 
-// ----- KEYBOARD RELEASE HANDLING -----
+// ----- KEYBOARD RELEASE Rules -----
 document.addEventListener("keyup", function(event) {
     keysPressed[event.key.toLowerCase()] = false;
     
@@ -203,14 +203,14 @@ canvas.addEventListener("touchstart", function(event) {
     }
 });
 
-// ----- TOUCH END HANDLER -----
+// ----- TOUCH END -----
 canvas.addEventListener("touchend", function(event) {
     if (gripGameActive) {
         squeezeInProgress = false;
     }
 });
 
-// ----- MOUSE CLICK HANDLER -----
+// ----- MOUSE CLICK  -----
 canvas.addEventListener("click", function(event) {
     const rect = canvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
@@ -285,13 +285,13 @@ function resetGripGameTimer() {
     }, 1000);
 }
 
-// ----- HANDLE FAILED GRIP GAME -----
+// -----  FAILED GRIP GAME -----
 function failGripGame() {
     clearInterval(gripGameTimerInterval);
     gripGameActive = false;
-    gripGameFailed = true; // Flag to prevent re-entering grip game
+    gripGameFailed = true; //  to prevent re-entering grip game
     
-    // Update endurance score for partial completion
+    // Update endurance score for kinda completion
     if (currentReps > 0 && currentResistanceIndex < resistanceLevels.length) {
         // Add points for partial completion at current level
         const partialPoints = Math.floor((currentReps / maxReps) * resistanceLevels[currentResistanceIndex]);
@@ -352,7 +352,7 @@ function startGripGame() {
     currentResistanceIndex = 0;
     currentReps = 0;
     
-    // get existing high score
+    // get  high score
     gripHighScore = getGripHighScore();
     enduranceScore = getEnduranceScore();
     
@@ -406,7 +406,7 @@ function update() {
 
     // ----- BIRD PHYSICS -----
     if (keysPressed['a'] && gameActive) {
-        // special A key boost
+        // special A key boost (what we using)
         bird.velocity += bird.fastJump;
         if (bird.velocity < -5) {
             bird.velocity = -5; // limit max speed
@@ -434,7 +434,7 @@ function update() {
         pipes.shift();
     }
 
-    // ----- COLLISION DETECTION -----
+    // ----- COLLISION checker -----
     for (let pipe of pipes) {
         if (
             (bird.x + bird.radius > pipe.x && bird.x - bird.radius < pipe.x + pipeWidth) &&
@@ -473,7 +473,7 @@ function draw() {
     // draw chart area (right side)
     drawChart();
     
-    // draw pause overlay
+    // draw pause 
     if (isPaused && !gripGameActive) {
         ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
         ctx.fillRect(gameAreaX, 0, gameAreaWidth, canvas.height);
@@ -489,7 +489,7 @@ function draw() {
         ctx.textAlign = "left"; // reset alignment
     }
 
-    // ----- GAME OVER SCREEN -----
+    // ----- GAME OVER  -----
     if (!gameActive) {
         ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
         ctx.fillRect(gameAreaX, 0, gameAreaWidth, canvas.height);
@@ -515,7 +515,7 @@ function draw() {
     }
 }
 
-// ----- DRAW GRIP GAME SCREEN -----
+// ----- DRAW GRIP GAME  -----
 function drawGripGame() {
     // background
     ctx.fillStyle = "#e0e0e0";
@@ -628,19 +628,19 @@ function drawChart() {
     let y = 100;
     const maxDisplay = 10; // max rows to show
     
-    // show newest entries first
+    // show newest  first
     const startIdx = Math.max(0, chartData.length - maxDisplay);
     for (let i = startIdx; i < chartData.length; i++) {
         const item = chartData[i];
         ctx.fillText(item.date, chartX + 20, y);
         
-        // highlight active input row
+        // show real input row
         if (i === chartData.length - 1 && isInputActive) {
             ctx.fillStyle = "rgba(0, 100, 255, 0.2)";
             ctx.fillRect(chartX + 110, y - 15, 80, 20);
             ctx.fillStyle = "#333";
             
-            // blinking cursor
+            // blinking thingy
             if (Math.floor(Date.now() / 500) % 2 === 0) {
                 const textWidth = ctx.measureText(currentInputValue).width;
                 ctx.fillRect(chartX + 120 + textWidth, y - 12, 1, 14);
@@ -776,3 +776,8 @@ function gameLoop() {
 
 // start the game!
 gameLoop();
+
+
+
+
+// Hours spent debugging: 12
