@@ -2,6 +2,7 @@
 //Hours spent debugging: 12
 
 //ignore this
+
 //git add .
 //git commit -m "Changes"
 //git push origin main  
@@ -401,16 +402,22 @@ function finishGripGame() {
 
 // ----- START FLAPPY BIRD GAME -----
 function startFlappyBird() {
+    // Clear all existing pipes first
+    pipes = [];
+    
     // Make sure bird is in a good starting position
     bird.y = 200;  // Position bird in middle of screen
     bird.velocity = 0;  // Reset velocity to prevent immediate falling
     
     gameActive = true;
-    createPipe();
+    isFirstPipe = true;  // Reset first pipe flag
     
     // Clear existing interval if any and create a new one
     clearInterval(pipeGenerationInterval);
     pipeGenerationInterval = setInterval(createPipe, pipeInterval);
+    
+    // Create first pipe after clearing everything
+    createPipe();
 }
 
 function startGripGame() {
@@ -827,6 +834,8 @@ function drawGame() {
 function gameOver() {
     gameActive = false;
     clearInterval(pipeGenerationInterval);
+    pipeGenerationInterval = null;
+    isFirstPipe = true;  // Add this line to reset the first pipe flag
     restartTimer = 10; // 10 sec cooldown
     restartCountdown = 10;
 
@@ -851,6 +860,7 @@ function resetGame() {
     pipes = [];
     isFirstPipe = true;
     clearInterval(pipeGenerationInterval);
+    pipeGenerationInterval = null;  // Add this line
     restartTimer = 0;
     gameTimer = 180;
     isPaused = false;
