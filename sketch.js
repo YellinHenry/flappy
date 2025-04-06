@@ -1,4 +1,7 @@
+//Henry Yellin 4-6-25
+//Hours spent debugging: 12
 
+//ignore this
 //git add .
 //git commit -m "Changes"
 //git push origin main  
@@ -11,11 +14,12 @@ canvas.width = 1200;
 canvas.height = 500;
 
 // ----- GAME VARS -----
-let gameActive = true;          // is game running?
+let gameActive = false;         // is game running? (starts false until grip test completes)
 let score = 0;                  // player score
 let restartTimer = 0;           // countdown to auto restart
 let restartCountdown = 10;      // seconds till restart
 let isFirstPipe = true;         // first pipe flag
+let pipeGenerationInterval;     // interval reference for pipe generation
 
 // ----- TIMER STUFF -----
 let gameTimer = 180;            // 3 min game time in sec
@@ -28,7 +32,7 @@ let pipeGap = 250;              // gap between pipes
 let pipeInterval = 8000;        // ms between new pipes
 
 // ----- GRIP GAME VARS -----
-let gripGameActive = false;     // is grip game running?
+let gripGameActive = true;      // is grip game running? (starts true)
 let gripGameTimer = 0;          // grip game timer
 let currentResistance = 10;     // current resistance (lbs)
 let currentReps = 0;            // completed reps
@@ -44,6 +48,7 @@ let gripGameTimeLimit = 10;     // seconds per level
 let gripGameTimeRemaining = 10; // seconds left in level
 let gripGameTimerInterval = null; // timer reference
 let gripGameFailed = false;     // track if grip game failed
+let gripGameCompleted = false;  // track if grip game completed successfully
 
 // ----- CHART STUFF -----
 let chartData = [];             // data for chart
@@ -71,7 +76,7 @@ let pipeWidth = 50;             // width of pipes
 // ----- INPUT TRACKING -----
 let keysPressed = {};           // which keys are pressed
 
-// ---- CURRENT DATE In MY   CHART -----
+// ---- CURRENT DATE In MY CHART -----
 function getCurrentDate() {
     const now = new Date();
     const day = String(now.getDate()).padStart(2, '0');
@@ -80,8 +85,19 @@ function getCurrentDate() {
     return `${month}/${day}/${year}`;
 }
 
-// add today's date to chart
-chartData.push({ date: getCurrentDate(), value: "" });
+// ----- LOAD CHART DATA FROM STORAGE -----
+function loadChartData() {
+    const savedData = localStorage.getItem("chartData");
+    if (savedData) {
+        return JSON.parse(savedData);
+    }
+    return [];
+}
+
+// ----- SAVE CHART DATA TO STORAGE -----
+function saveChartData(data) {
+    localStorage.setItem("chartData", JSON.stringify(data));
+}
 
 // ----- GET HIGH SCORE FROM STORAGE -----
 function getHighScore() {
@@ -98,11 +114,24 @@ function getEnduranceScore() {
     return parseInt(localStorage.getItem("enduranceScore")) || 0;
 }
 
-// create first pipe
-createPipe();
+// ----- INITIALIZE CHART DATA -----
+function initializeChartData() {
+    chartData = loadChartData();
+    
+    // Check if we already have an entry for today
+    const today = getCurrentDate();
+    const todayEntry = chartData.find(item => item.date === today);
+    
+    if (!todayEntry) {
+        // No entry for today, add new one
+        chartData.push({ date: today, value: "" });
+    }
+    
+    saveChartData(chartData);
+}
 
-// start making pipes regularly
-let pipeGenerationInterval = setInterval(createPipe, pipeInterval);
+// Initialize chart data on startup
+initializeChartData();
 
 // ----- CREATE A NEW PIPE -----
 function createPipe() {
@@ -129,14 +158,14 @@ document.addEventListener("keydown", function(event) {
     keysPressed[key] = true;
 
     // restart with A key
-    if (key === 'a' && !gameActive && restartTimer <= 0) {
+    if (key === 'a' && !gameActive && !gripGameActive && restartTimer <= 0) {
         resetGame();
     }
 
     // space = jump or restart
     if (event.code === "Space") {
         // restart game
-        if (!gameActive && restartTimer <= 0) {
+        if (!gameActive && !gripGameActive && restartTimer <= 0) {
             resetGame();
         }
         // jump in flappy bird
@@ -153,10 +182,17 @@ document.addEventListener("keydown", function(event) {
     // ----- CHART INPUT STUFF -----
     if (isInputActive) {
         if (event.key === "Enter") {
-            // save input and add new row
-            chartData[chartData.length - 1].value = currentInputValue;
-            chartData.push({ date: getCurrentDate(), value: "" });
+            // save input and update chart
+            const today = getCurrentDate();
+            const todayIndex = chartData.findIndex(item => item.date === today);
+            
+            if (todayIndex !== -1) {
+                chartData[todayIndex].value = currentInputValue;
+                saveChartData(chartData);
+            }
+            
             currentInputValue = "";
+            isInputActive = false;
         }
         else if (event.key === "Backspace") {
             // delete last character
@@ -168,7 +204,7 @@ document.addEventListener("keydown", function(event) {
         event.preventDefault();  // prevent keyboard actions
     }
     
-    // move chart input with Tab. prob needa delete TS.PMO
+    // move chart input with Tab
     if (event.key === "Tab") {
         isInputActive = !isInputActive;
         event.preventDefault();
@@ -189,7 +225,7 @@ document.addEventListener("keyup", function(event) {
 canvas.addEventListener("touchstart", function(event) {
     event.preventDefault();
     // restart game
-    if (!gameActive && restartTimer <= 0) {
+    if (!gameActive && !gripGameActive && restartTimer <= 0) {
         resetGame();
     }
     // jump in flappy bird
@@ -221,7 +257,7 @@ canvas.addEventListener("click", function(event) {
         isInputActive = true;
     } else {
         // normal game click
-        if (!gameActive && restartTimer <= 0) {
+        if (!gameActive && !gripGameActive && restartTimer <= 0) {
             resetGame();
         }
         // jump in flappy bird
@@ -241,8 +277,12 @@ canvas.addEventListener("click", function(event) {
     }
 });
 
-// ----- HANDLE GRIP SQUEEZE ACTION -----
 function handleGripSqueeze() {
+    // Start timer on first click if timer hasn't started yet
+    if (gripGameTimerInterval === null) {
+        resetGripGameTimer();
+    }
+    
     lastSqueezeTime = Date.now();
     currentReps++;
     
@@ -261,11 +301,15 @@ function handleGripSqueeze() {
         // go to next resistance level
         currentResistanceIndex++;
         currentReps = 0;
-        resetGripGameTimer();
+        
+        // Reset timer for next level
+        clearInterval(gripGameTimerInterval);
+        gripGameTimerInterval = null;
+        gripGameTimeRemaining = gripGameTimeLimit;
         
         // check if completed all levels
         if (currentResistanceIndex >= resistanceLevels.length) {
-            // all done! back to flappy bird
+            // all done! finish grip game and start flappy bird
             finishGripGame();
         }
     }
@@ -275,12 +319,15 @@ function handleGripSqueeze() {
 function resetGripGameTimer() {
     gripGameTimeRemaining = gripGameTimeLimit;
     clearInterval(gripGameTimerInterval);
+    
+    // Create a new timer that runs every second
     gripGameTimerInterval = setInterval(() => {
         gripGameTimeRemaining--;
+        
+        // Check if time's up
         if (gripGameTimeRemaining <= 0) {
-            // time's up! failed the test - return to flappy bird
             clearInterval(gripGameTimerInterval);
-            failGripGame(); // NEW FUNCTION to handle failing
+            failGripGame();
         }
     }, 1000);
 }
@@ -289,9 +336,10 @@ function resetGripGameTimer() {
 function failGripGame() {
     clearInterval(gripGameTimerInterval);
     gripGameActive = false;
-    gripGameFailed = true; //  to prevent re-entering grip game
+    gripGameFailed = true;
+    gripGameCompleted = true;
     
-    // Update endurance score for kinda completion
+    // Update endurance score for partial completion
     if (currentReps > 0 && currentResistanceIndex < resistanceLevels.length) {
         // Add points for partial completion at current level
         const partialPoints = Math.floor((currentReps / maxReps) * resistanceLevels[currentResistanceIndex]);
@@ -299,77 +347,100 @@ function failGripGame() {
         localStorage.setItem("enduranceScore", enduranceScore);
     }
     
-    // Add today's endurance score to chart
-    chartData[chartData.length - 1].value = enduranceScore.toString();
-    chartData.push({ date: getCurrentDate(), value: "" });
-    currentInputValue = "";
+    // Update today's endurance score in chart
+    updateTodayScoreInChart();
     
     // Reset grip game variables but keep the score
     currentReps = 0;
     squeezeInProgress = false;
     
-    // Return to flappy bird
-    isPaused = false;
+    // Start flappy bird
+    startFlappyBird();
     
-    console.log("Grip game failed - returning to Flappy Bird permanently");
+    console.log("Grip game failed - starting Flappy Bird");
+}
+
+// ----- UPDATE TODAY'S SCORE IN CHART -----
+function updateTodayScoreInChart() {
+    const today = getCurrentDate();
+    const todayIndex = chartData.findIndex(item => item.date === today);
+    
+    if (todayIndex !== -1) {
+        // Only update if new score is higher than existing score
+        const currentScore = parseInt(chartData[todayIndex].value) || 0;
+        if (enduranceScore > currentScore) {
+            chartData[todayIndex].value = enduranceScore.toString();
+            saveChartData(chartData);
+        }
+    } else {
+        // No entry for today yet, create new one
+        chartData.push({ date: today, value: enduranceScore.toString() });
+        saveChartData(chartData);
+    }
 }
 
 // ----- FINISH GRIP GAME SUCCESSFULLY -----
 function finishGripGame() {
     clearInterval(gripGameTimerInterval);
     gripGameActive = false;
-    gripGameFailed = true; // Flag to prevent re-entering grip game
+    gripGameFailed = false;
+    gripGameCompleted = true;
     
-    // Add today's endurance score to chart
-    chartData[chartData.length - 1].value = enduranceScore.toString();
-    chartData.push({ date: getCurrentDate(), value: "" });
-    currentInputValue = "";
+    // Update today's endurance score in chart
+    updateTodayScoreInChart();
     
-    // Return to flappy bird with the same score
-    if (gameTimer <= 0) {
-        gameOver();
-    } else {
-        // Resume flappy bird
-        isPaused = false;
-        
-        // Reset grip game variables
-        currentReps = 0;
-        squeezeInProgress = false;
-    }
+    // Reset grip game variables but keep the score
+    currentReps = 0;
+    squeezeInProgress = false;
     
-    console.log("Grip game completed successfully - returning to Flappy Bird permanently");
+    // Start flappy bird game
+    startFlappyBird();
+    
+    console.log("Grip game completed successfully - starting Flappy Bird");
 }
 
-// ----- START GRIP STRENGTH GAME -----
-function startGripGame() {
-    // Don't restart grip game if it was already failed or completed
-    if (gripGameFailed) {
-        return;
-    }
+// ----- START FLAPPY BIRD GAME -----
+function startFlappyBird() {
+    // Make sure bird is in a good starting position
+    bird.y = 200;  // Position bird in middle of screen
+    bird.velocity = 0;  // Reset velocity to prevent immediate falling
     
+    gameActive = true;
+    createPipe();
+    
+    // Clear existing interval if any and create a new one
+    clearInterval(pipeGenerationInterval);
+    pipeGenerationInterval = setInterval(createPipe, pipeInterval);
+}
+
+function startGripGame() {
+    // Reset previous grip game data
     gripGameActive = true;
+    gripGameFailed = false;
+    gripGameCompleted = false;
     currentResistance = resistanceLevels[0];
     currentResistanceIndex = 0;
     currentReps = 0;
     
-    // get  high score
+    // get high score
     gripHighScore = getGripHighScore();
     enduranceScore = getEnduranceScore();
     
-    // start the grip game timer
-    resetGripGameTimer();
+    // Initialize the timer value but don't start it yet
+    gripGameTimeRemaining = gripGameTimeLimit;
+    gripGameTimerInterval = null;
 }
 
 // ----- MAIN GAME UPDATE LOOP -----
 function update() {
-    // Only start grip game if not failed previously
-    if (gameActive && !isPaused && !gripGameActive && !gripGameFailed && gameTimer <= 160) {
-        startGripGame();
-    }
-    
-    // skip flappy bird logic if grip game is active
+    // If grip game is active, handle it separately
     if (gripGameActive) {
         return;
+    }
+    
+    // If game is not active yet but grip game is completed, start flappy bird
+    if (!gameActive && gripGameCompleted && restartTimer <= 0) {
+        startFlappyBird();
     }
     
     // update game timer
@@ -394,19 +465,22 @@ function update() {
     }
 
     // if game over, handle restart timer
-    if (!gameActive) {
-        if (restartTimer > 0) {
-            restartTimer -= (1/60); 
-            if (restartTimer <= 0) {
-                restartCountdown = 0;
-            }
+    if (!gameActive && !gripGameActive && restartTimer > 0) {
+        restartTimer -= (1/60); 
+        if (restartTimer <= 0) {
+            restartCountdown = 0;
         }
+        return;
+    }
+
+    // If not in gameplay state, exit early
+    if (!gameActive) {
         return;
     }
 
     // ----- BIRD PHYSICS -----
     if (keysPressed['a'] && gameActive) {
-        // special A key boost (what we using)
+        // special A key boost
         bird.velocity += bird.fastJump;
         if (bird.velocity < -5) {
             bird.velocity = -5; // limit max speed
@@ -490,7 +564,7 @@ function draw() {
     }
 
     // ----- GAME OVER  -----
-    if (!gameActive) {
+    if (!gameActive && !gripGameActive && restartTimer > 0) {
         ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
         ctx.fillRect(gameAreaX, 0, gameAreaWidth, canvas.height);
         
@@ -510,6 +584,25 @@ function draw() {
         } else {
             ctx.fillText("press space to play again", gameAreaWidth / 2, canvas.height / 2 + 120);
         }
+        
+        ctx.textAlign = "left"; // reset text alignment
+    }
+    
+    // Show play again message when restart timer expires
+    if (!gameActive && !gripGameActive && restartTimer <= 0) {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        ctx.fillRect(gameAreaX, 0, gameAreaWidth, canvas.height);
+        
+        ctx.fillStyle = "white";
+        ctx.font = "48px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("Game Over", gameAreaWidth / 2, canvas.height / 2 - 50);
+        
+        ctx.font = "36px Arial";
+        ctx.fillText("Score: " + score, gameAreaWidth / 2, canvas.height / 2);
+        ctx.fillText("Grip Strength: " + gripHighScore + " lbs", gameAreaWidth / 2, canvas.height / 2 + 40);
+        ctx.fillText("Endurance Score: " + enduranceScore, gameAreaWidth / 2, canvas.height / 2 + 80);
+        ctx.fillText("Press SPACE to play again", gameAreaWidth / 2, canvas.height / 2 + 120);
         
         ctx.textAlign = "left"; // reset text alignment
     }
@@ -533,9 +626,13 @@ function drawGripGame() {
     
     // time remaining (red when low)
     ctx.font = "bold 24px Arial";
-    ctx.fillStyle = gripGameTimeRemaining <= 3 ? "red" : "#333";
-    ctx.fillText(`Time: ${gripGameTimeRemaining}s`, gameAreaWidth / 2, 160);
-    ctx.fillStyle = "#333"; // reset color
+    if (gripGameTimerInterval === null) {
+        ctx.fillText("Click to start timer", gameAreaWidth / 2, 160);
+    } else {
+        ctx.fillStyle = gripGameTimeRemaining <= 3 ? "red" : "#333";
+        ctx.fillText(`Time: ${gripGameTimeRemaining}s`, gameAreaWidth / 2, 160);
+        ctx.fillStyle = "#333"; // reset color
+    }
     
     // draw grip tool
     drawGripTool(gameAreaWidth / 2, canvas.height / 2);
@@ -551,7 +648,11 @@ function drawGripGame() {
     
     // instructions
     ctx.font = "18px Arial";
-    ctx.fillText("Press SPACE or Click to squeeze", gameAreaWidth / 2, canvas.height - 40);
+    if (gripGameTimerInterval === null) {
+        ctx.fillText("Press SPACE or Click to start", gameAreaWidth / 2, canvas.height - 40);
+    } else {
+        ctx.fillText("Press SPACE or Click to squeeze", gameAreaWidth / 2, canvas.height - 40);
+    }
     
     ctx.textAlign = "left"; // reset alignment
 }
@@ -609,13 +710,13 @@ function drawChart() {
     ctx.fillStyle = "#333";
     ctx.font = "bold 18px Arial";
     ctx.textAlign = "center";
-    ctx.fillText("Date Chart", chartX + chartWidth / 2, 30);
+    ctx.fillText("Endurance Chart", chartX + chartWidth / 2, 30);
     ctx.textAlign = "left";
     
     // headers
     ctx.font = "bold 16px Arial";
     ctx.fillText("Date", chartX + 20, 60);
-    ctx.fillText("Number", chartX + 120, 60);
+    ctx.fillText("Score", chartX + 120, 60);
     
     // line under headers
     ctx.beginPath();
@@ -628,26 +729,34 @@ function drawChart() {
     let y = 100;
     const maxDisplay = 10; // max rows to show
     
-    // show newest  first
+    // show newest first
     const startIdx = Math.max(0, chartData.length - maxDisplay);
     for (let i = startIdx; i < chartData.length; i++) {
         const item = chartData[i];
         ctx.fillText(item.date, chartX + 20, y);
         
-        // show real input row
-        if (i === chartData.length - 1 && isInputActive) {
-            ctx.fillStyle = "rgba(0, 100, 255, 0.2)";
-            ctx.fillRect(chartX + 110, y - 15, 80, 20);
-            ctx.fillStyle = "#333";
-            
-            // blinking thingy
-            if (Math.floor(Date.now() / 500) % 2 === 0) {
-                const textWidth = ctx.measureText(currentInputValue).width;
-                ctx.fillRect(chartX + 120 + textWidth, y - 12, 1, 14);
+        // highlight today's row
+        if (item.date === getCurrentDate()) {
+            if (isInputActive && i === chartData.length - 1) {
+                ctx.fillStyle = "rgba(0, 100, 255, 0.2)";
+                ctx.fillRect(chartX + 110, y - 15, 80, 20);
+                ctx.fillStyle = "#333";
+                
+                // blinking cursor
+                if (Math.floor(Date.now() / 500) % 2 === 0) {
+                    const textWidth = ctx.measureText(currentInputValue).width;
+                    ctx.fillRect(chartX + 120 + textWidth, y - 12, 1, 14);
+                }
+                ctx.fillText(currentInputValue, chartX + 120, y);
+            } else {
+                // Today's existing value
+                ctx.fillText(item.value, chartX + 120, y);
             }
+        } else {
+            // Previous days
+            ctx.fillText(item.value, chartX + 120, y);
         }
         
-        ctx.fillText(i === chartData.length - 1 ? currentInputValue : item.value, chartX + 120, y);
         y += 30;
     }
     
@@ -704,23 +813,12 @@ function drawGame() {
     ctx.fillText("Score: " + score, 10, 30);
     ctx.fillText("High Score: " + getHighScore(), 10, 60);
     ctx.fillText("Grip High Score: " + getGripHighScore() + " lbs", 10, 90);
+    ctx.fillText("Endurance Score: " + enduranceScore, 10, 120);
     
     // timer (red when low)
     ctx.textAlign = "right";
     ctx.fillStyle = gameTimer < 30 ? "red" : "white";
     ctx.fillText("Time: " + formatTime(gameTimer), gameAreaWidth - 10, 30);
-    
-    // grip game countdown (only show if not failed already)
-    if (!gripGameFailed && gameTimer > 140 && gameTimer <= 160) {
-        ctx.fillStyle = "yellow";
-        ctx.fillText("Grip Game in: " + Math.ceil(gameTimer - 160) + "s", gameAreaWidth - 10, 60);
-    }
-    
-    // if grip game was failed, show status
-    if (gripGameFailed) {
-        ctx.fillStyle = "orange";
-        ctx.fillText("Grip Test Complete", gameAreaWidth - 10, 60);
-    }
     
     ctx.textAlign = "left"; // reset alignment
 }
@@ -728,9 +826,7 @@ function drawGame() {
 // ----- GAME OVER HANDLER -----
 function gameOver() {
     gameActive = false;
-    gripGameActive = false;
     clearInterval(pipeGenerationInterval);
-    clearInterval(gripGameTimerInterval);
     restartTimer = 10; // 10 sec cooldown
     restartCountdown = 10;
 
@@ -743,28 +839,32 @@ function gameOver() {
 
 // ----- RESET GAME TO START -----
 function resetGame() {
-    gameActive = true;
-    gripGameActive = false;
-    gripGameFailed = false; // Reset this too so grip game can happen again
+    // Reset endurance score for new game
+    enduranceScore = 0;
+    localStorage.setItem("enduranceScore", enduranceScore);
+    
+    // Reset flappy bird game
+    gameActive = false;
     score = 0;
     bird.y = 200;
     bird.velocity = 0;
     pipes = [];
-    isFirstPipe = true;  // reset first pipe flag
-    createPipe();
+    isFirstPipe = true;
     clearInterval(pipeGenerationInterval);
-    pipeGenerationInterval = setInterval(createPipe, pipeInterval);
     restartTimer = 0;
-    gameTimer = 180; // reset to 3 minutes
+    gameTimer = 180;
     isPaused = false;
     
-    // reset grip game vars
+    // Reset grip game vars to start with grip game
+    gripGameActive = true;
+    gripGameFailed = false;
+    gripGameCompleted = false;
     currentResistanceIndex = 0;
     currentReps = 0;
     clearInterval(gripGameTimerInterval);
     
-    // reset endurance score for new game
-    enduranceScore = 0;
+    // Start with grip game
+    startGripGame();
 }
 
 // ----- MAIN GAME LOOP -----
@@ -780,4 +880,3 @@ gameLoop();
 
 
 
-// Hours spent debugging: 12
