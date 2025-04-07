@@ -1,5 +1,5 @@
 //Henry Yellin 4-6-25
-//Hours spent debugging: 12
+//Hours spent debugging: 13
 
 //ignore this
 
@@ -28,9 +28,9 @@ let pauseTimer = 0;             // pause duration in sec
 let isPaused = false;           // is game paused?
 
 // ----- FLAPPY BIRD SETTINGS -----
-let pipeSpeed = 2.0;            // how fast pipes move
+let pipeSpeed = 2.45;            // how fast pipes move
 let pipeGap = 250;              // gap between pipes
-let pipeInterval = 8000;        // ms between new pipes
+let pipeInterval = 5500;        // ms between new pipes
 
 // ----- GRIP GAME VARS -----
 let gripGameActive = true;      // is grip game running? (starts true)
@@ -41,7 +41,7 @@ let maxReps = 10;               // reps needed to advance
 let gripHighScore = 0;          // best resistance completed
 let enduranceScore = 0;         // total endurance points
 let lastSqueezeTime = 0;        // time of last squeeze
-let cooldownPeriod = 500;       // ms between squeezes
+let cooldownPeriod = 350;       // ms between squeezes
 let squeezeInProgress = false;  // is player squeezing?
 let resistanceLevels = [10, 8, 6, 4, 2, 1]; // resistance levels
 let currentResistanceIndex = 0; // current level index
@@ -675,7 +675,7 @@ function drawGripTool(x, y) {
     ctx.fillRect(x - gripWidth/2, y - gripHeight/2, gripWidth, gripHeight);
     
     // grip handles (change position when squeezed)
-    ctx.fillStyle = "#222";
+    ctx.fillStyle = "#ff0000";
     
     // left handle
     if (squeezeInProgress) {
@@ -697,7 +697,7 @@ function drawGripTool(x, y) {
     
     // resistance indicator (progress bar)
     const resistanceHeight = (gripHeight - 20) * (currentReps / maxReps);
-    ctx.fillStyle = "#ff5722";
+    ctx.fillStyle = "#fffff";
     ctx.fillRect(x - 10, y + gripHeight/2 - 10 - resistanceHeight, 20, resistanceHeight);
 }
 
